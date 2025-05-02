@@ -93,6 +93,7 @@ ena = { version = "0.14.3", optional = true, default-features = false }
 log = "0.4"
 ordered-float = { version = "5", default-features = false }
 thiserror = { version = "2", default-features = false }
+robust = "1.1.0"
 
 [dev-dependencies]
 oorandom = "11"

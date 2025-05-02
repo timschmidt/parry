@@ -15,6 +15,15 @@ use {crate::shape::FeatureId, core::f64};
 #[cfg(feature = "dim2")]
 use crate::shape::PackedFeatureId;
 
+// ──────────────────────────────────────────────────────────────────────────────
+//  Robust orientation predicates
+// ──────────────────────────────────────────────────────────────────────────────
+// We use the GeoRust `robust` crate.  Its orient2d/orient3d functions are exact
+// (Shewchuk‑style adaptive) and therefore eliminate the epsilon‑tuning that
+// was used throughout the old code.  They return a positive value for CCW,
+// a negative value for CW, and 0 for collinear / coplanar. 
+use robust::{orient2d, Coord as RobustCoord};
+
 #[cfg(feature = "rkyv")]
 use rkyv::{bytecheck, CheckBytes};
 
@@ -114,6 +123,11 @@ impl From<[Point<Real>; 3]> for Triangle {
     fn from(arr: [Point<Real>; 3]) -> Self {
         *Self::from_array(&arr)
     }
+}
+
+#[inline(always)]
+fn rc(p: &na::Point2<Real>) -> RobustCoord<f64> {
+    RobustCoord { x: p.coords[0] as f64, y: p.coords[1] as f64 }
 }
 
 impl Triangle {
@@ -483,15 +497,14 @@ impl Triangle {
     /// Tests if a point is inside of this triangle.
     #[cfg(feature = "dim2")]
     pub fn contains_point(&self, p: &Point<Real>) -> bool {
-        let ab = self.b - self.a;
-        let bc = self.c - self.b;
-        let ca = self.a - self.c;
-        let sgn1 = ab.perp(&(p - self.a));
-        let sgn2 = bc.perp(&(p - self.b));
-        let sgn3 = ca.perp(&(p - self.c));
-        sgn1.signum() * sgn2.signum() >= 0.0
-            && sgn1.signum() * sgn3.signum() >= 0.0
-            && sgn2.signum() * sgn3.signum() >= 0.0
+        // Robust point‑in‑triangle test based only on the signs of three
+        // orientation predicates.
+        let s1 = orient2d(rc(&self.a), rc(&self.b), rc(p));
+        let s2 = orient2d(rc(&self.b), rc(&self.c), rc(p));
+        let s3 = orient2d(rc(&self.c), rc(&self.a), rc(p));
+
+        (s1 >= 0.0 && s2 >= 0.0 && s3 >= 0.0) ||
+        (s1 <= 0.0 && s2 <= 0.0 && s3 <= 0.0)
     }
 
     /// Tests if a point is inside of this triangle.
@@ -550,14 +563,10 @@ impl Triangle {
     /// smaller than `epsilon`.
     #[cfg(feature = "dim2")]
     pub fn orientation(&self, epsilon: Real) -> TriangleOrientation {
-        let area2 = (self.b - self.a).perp(&(self.c - self.a));
-        // println!("area2: {}", area2);
-        if area2 > epsilon {
-            TriangleOrientation::CounterClockwise
-        } else if area2 < -epsilon {
-            TriangleOrientation::Clockwise
-        } else {
-            TriangleOrientation::Degenerate
+        match orient2d(rc(&self.a), rc(&self.b), rc(&self.c)) {
+            v if v > 0.0 => TriangleOrientation::CounterClockwise,
+            v if v < 0.0 => TriangleOrientation::Clockwise,
+            _            => TriangleOrientation::Degenerate,
         }
     }
 
@@ -571,14 +580,10 @@ impl Triangle {
         c: &na::Point2<Real>,
         epsilon: Real,
     ) -> TriangleOrientation {
-        let area2 = (b - a).perp(&(c - a));
-        // println!("area2: {}", area2);
-        if area2 > epsilon {
-            TriangleOrientation::CounterClockwise
-        } else if area2 < -epsilon {
-            TriangleOrientation::Clockwise
-        } else {
-            TriangleOrientation::Degenerate
+        match orient2d(rc(a), rc(b), rc(c)) {
+            v if v > 0.0 => TriangleOrientation::CounterClockwise,
+            v if v < 0.0 => TriangleOrientation::Clockwise,
+            _            => TriangleOrientation::Degenerate,
         }
     }
 
