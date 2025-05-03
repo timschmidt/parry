@@ -515,10 +515,6 @@ impl Triangle {
     /// Tests if a point is inside of this triangle.
     #[cfg(feature = "dim3")]
     pub fn contains_point(&self, p: &Point<Real>) -> bool {
-        let vb = self.b - self.a;
-        let vc = self.c - self.a;
-        let vp = p - self.a;
-
         // ------------------------------------------------------------------
         // 1.  Robust coplanarity check with orient3d
         // ------------------------------------------------------------------
@@ -544,6 +540,10 @@ impl Triangle {
         // In order to avoid divisions and sqrts we scale both B and C - so
         // b = vb.dot(nc) * B and c = vc.dot(nb) * C - this results in harder-to-follow math but
         // hopefully fast code.
+        
+        let vb = self.b - self.a;
+        let vc = self.c - self.a;
+        let vp = p - self.a;
 
         let nb = vb.cross(&n);
         let nc = vc.cross(&n);
