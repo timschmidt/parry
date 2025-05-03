@@ -515,11 +515,9 @@ impl Triangle {
     /// Tests if a point is inside of this triangle.
     #[cfg(feature = "dim3")]
     pub fn contains_point(&self, p: &Point<Real>) -> bool {
-        // ------------------------------------------------------------------
-        // 1.  Robust coplanarity check with orient3d
-        // ------------------------------------------------------------------
+        // Robust coplanarity check with orient3d
         if orient3d(rc3(&self.a), rc3(&self.b), rc3(&self.c), rc3(p)) != 0.0 {
-            return false;        // P is definitively not on the triangle plane.
+            return false; // P is definitively not on the triangle plane.
         }
 
         // Degenerate triangle?  Bail early.
@@ -528,6 +526,8 @@ impl Triangle {
             return false;
         }
 
+        // Barycentric coordinate test
+        //
         // We are seeking B, C such that vp = vb * B + vc * C .
         // If B and C are both in [0, 1] and B + C <= 1 then p is in the triangle.
         //
