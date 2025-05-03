@@ -22,7 +22,7 @@ use crate::shape::PackedFeatureId;
 // (Shewchuk‑style adaptive) and therefore eliminate the epsilon‑tuning that
 // was used throughout the old code.  They return a positive value for CCW,
 // a negative value for CW, and 0 for collinear / coplanar. 
-use robust::{orient2d, Coord as RobustCoord};
+use robust::{orient2d, orient3d, Coord as RobustCoord, Coord3D as RobustCoord3D};
 
 #[cfg(feature = "rkyv")]
 use rkyv::{bytecheck, CheckBytes};
@@ -127,7 +127,12 @@ impl From<[Point<Real>; 3]> for Triangle {
 
 #[inline(always)]
 fn rc(p: &na::Point2<Real>) -> RobustCoord<f64> {
-    RobustCoord { x: p.coords[0] as f64, y: p.coords[1] as f64 }
+    RobustCoord { x: p.x as f64, y: p.y as f64 }
+}
+
+#[inline(always)]
+fn rc3(p: &na::Point3<Real>) -> RobustCoord3D<f64> {
+    RobustCoord3D { x: p.x as f64, y: p.y as f64, z: p.z as f64 }
 }
 
 impl Triangle {
@@ -510,17 +515,20 @@ impl Triangle {
     /// Tests if a point is inside of this triangle.
     #[cfg(feature = "dim3")]
     pub fn contains_point(&self, p: &Point<Real>) -> bool {
-        const EPS: Real = crate::math::DEFAULT_EPSILON;
-
         let vb = self.b - self.a;
         let vc = self.c - self.a;
         let vp = p - self.a;
 
-        let n = vc.cross(&vb);
-        let n_norm = n.norm_squared();
-        if n_norm < EPS || vp.dot(&n).abs() > EPS * n_norm {
-            // the triangle is degenerate or the
-            // point does not lie on the same plane as the triangle.
+        // ------------------------------------------------------------------
+        // 1.  Robust coplanarity check with orient3d
+        // ------------------------------------------------------------------
+        if orient3d(rc3(&self.a), rc3(&self.b), rc3(&self.c), rc3(p)) != 0.0 {
+            return false;        // P is definitively not on the triangle plane.
+        }
+
+        // Degenerate triangle?  Bail early.
+        let n = (self.b - self.a).cross(&(self.c - self.a));
+        if n == Vector::<Real>::zeros() {
             return false;
         }
 
